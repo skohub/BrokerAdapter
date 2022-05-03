@@ -1,17 +1,16 @@
 # BrokerAdapter
 
-Идея проекта в том, чтобы превратить синхронный HTTP-запрос в асинхронный запрос через очередь сообщений.
+Combines similar HTTP requests together to make a single call to backend. 
 
-Одинаковые HTTP-запросы группируются и отправляются в очередь сообщений (MQ) только один раз. Например:
+Use case:
+1) An HTTP request with URL "/api/value/1" comes. The application understands there are no similar requests pending and publishes a message to a Message Queue to start request processing.
+2) A similar HTTP request with URL "/api/value/1" comes. In this case no new messages are published to the Message Queue. The HTTP request synchronously waits for the response from the Message Queue, similar to the first one.
+3) The response from the Message Queue comes. Both pending clients are released with the same response.
 
-1) Приходит запрос /api/value/1. Т.к. очереди на подобный запрос еще нет, она создается и отправляется сообщение в MQ (endpoint: /api/value, parameters: 1)
-2) Снова приходит запрос /api/value/1, запрос добавляется в существующую очередь, сообщение в MQ не посылается. При этом HTTP-клиент синхронно ожидает ответа.
-3) Приходит ответ из MQ и сразу рассылается всем ожидающим клиентам, при условии, что у них еще не вышел timeout.
+## Memory Queue implementation
 
-## Реализация MQ через файловую систему
+For simplicity sake the Memory Queue is implemented using files and folders.
 
-В тестовых целях очередь сообщений реализована при помощи папок и файлов.
+*Publish* - creates a file in the requests folder. File name is a hash of URL + HTTP verb.
 
-*Publish* - создание файла в папке с запросами, название файла - хэш от url + http verb.
-
-*Retrieve* - чтение файла из папки ответов с таким же названием, как и у запроса. Если на момент чтения файл не существует, то файловая система будет поллиться, пока файл не появится.
+*Retrieve* - polls a file with the same hash in the responses folder until it's created.
